@@ -1,0 +1,79 @@
+#include "echo_server.h"
+
+#include <stdio.h> 
+#include <string.h> 
+#include <unistd.h>
+
+#define MINIMUM_PORT_NUMBER 1024
+#define MAAXIMUM_PORT_NUMBER 65535
+#define DEFAULT_PORT_NUMBER 2000
+#define MAX_COMMAND_LINE_ARGUMENTS 4
+
+// ========================= MAIN FUNCTION ========================= //
+// This function parses the command line arguments to assign a port  //
+// number and enable verbose mode. It creates a listening socket and //
+// accepts incoming connections. It also handles the shutdown of the //
+// server.                                                           //
+// ================================================================  //
+
+int main(int argc, char* argv[]){
+
+    ServerConfig server_config; // Server configuration structure which will be passed to threads
+    server_config.port_number = DEFAULT_PORT_NUMBER; 
+    server_config.verbose_mode = 0; 
+
+    int p_flag = 0;;
+    int p_arg_index;
+
+    // Check for flags in command line arguments
+    // -p <port> to specify the port number
+    // -v to print received messages to terminal 
+    
+    for (int ix = 1; ix < argc; ix++) {
+        if (strcmp(argv[ix], "-p") == 0) {
+            p_flag = 1;
+            p_arg_index = ix + 1; 
+        } else if (strcmp(argv[ix], "-v") == 0) {
+            server_config.verbose_mode = 1;
+        }
+    }
+
+    server_config.port_number = DEFAULT_PORT_NUMBER;
+
+    // Check command line arguments for -p and -v flags, and port number
+    if (argc > 1){
+
+        if((p_flag == 0 && !server_config.verbose_mode) || argc > MAX_COMMAND_LINE_ARGUMENTS){
+            printf("Invalid command line arguments\n");
+            return 1;
+        }
+
+        if(p_flag){
+
+            int parsed_character_count;
+            if (sscanf(argv[p_arg_index], "%d%n", &server_config.port_number, &parsed_character_count) != 1 || argv[p_arg_index][parsed_character_count] != '\0' 
+                || server_config.port_number <= MINIMUM_PORT_NUMBER || server_config.port_number > MAAXIMUM_PORT_NUMBER || p_arg_index >= argc ) {
+                printf("Failed to provide a valid port\n");
+                return 1;
+            }
+        } 
+
+        if(server_config.verbose_mode){
+            printf("Verbose mode enabled\n");
+        }
+    }
+
+    int socket_fd = createListeningSocket(server_config.port_number); // Create a listening socket on the specified port
+
+    if (socket_fd < 0) {
+        fprintf(stderr, "Failed to create listening socket. Exiting.\n");
+        return 1;
+    }
+
+    acceptConnections(socket_fd, &server_config); // Accept incoming connections and handle them in separate threads
+
+    // Not reaching this points means the server shut down 
+    close(socket_fd); // Close the listening socket
+    printf("Closed listening socket\n");
+    return 0; 
+}
